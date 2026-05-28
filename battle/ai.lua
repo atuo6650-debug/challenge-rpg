@@ -11,10 +11,14 @@ function M.decide(u, target)
     -- 特殊行動
     if u.special >= 100 then
 
-        if u.special_condition == "stun" and target.stunned then
+        if (u.special_condition == "stun" or u.special_condition == "wait_stunned") and target.stunned then
             u.special = 0
             u.action = "special"
             u.cost = 0
+            return
+        end
+
+        if u.special_condition == "wait_stunned" then
             return
         end
 

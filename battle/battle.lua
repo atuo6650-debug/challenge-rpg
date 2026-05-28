@@ -13,6 +13,51 @@ local enemies = require("data.enemy")
 local M = {}
 
 local hero, enemy
+local actionLogs = {}
+local MAX_LOGS = 12
+local battleEnded = false
+local battleResult = nil
+
+local function addLog(text)
+    table.insert(actionLogs, text)
+    if #actionLogs > MAX_LOGS then
+        table.remove(actionLogs, 1)
+    end
+end
+
+local function applyDamage(attacker, target, actionName, rawDamage)
+    local dmg = math.max(1, math.floor(rawDamage + 0.5))
+    target.hp = math.max(0, math.floor(target.hp - dmg))
+    addLog(string.format("%s | %s | %s | %d", attacker.name, actionName, target.name, dmg))
+    return dmg
+end
+
+local function resolveStunLogs(unit)
+    if unit.just_stunned then
+        addLog(string.format("%s | stun_start | %s | 0", unit.name, unit.name))
+        unit.just_stunned = false
+    end
+    if unit.just_recovered then
+        addLog(string.format("%s | stun_cleared | %s | 0", unit.name, unit.name))
+        unit.just_recovered = false
+    end
+end
+
+local function addCounterGauge(unit)
+    local gain = 10
+    local armors = {unit.a1, unit.a2}
+    for _, armor in ipairs(armors) do
+        if armor and armor.counter_gain then
+            gain = math.max(gain, armor.counter_gain)
+        end
+    end
+
+    unit.counter_gauge = unit.counter_gauge + gain
+    if unit.counter_gauge >= 100 then
+        unit.counter_ready = true
+        unit.counter_gauge = unit.counter_gauge - 100
+    end
+end
 
 function createUnit(data)
 
@@ -73,19 +118,20 @@ function createUnit(data)
     end
 
     -- カウンター
-    u.counter_stack=0
+    u.counter_gauge=0
+    u.counter_ready=false
     u.counter_rate=data.counter_rate or 0.5
 
     return u
 end
 
 function counterCheck(a,b)
-    if a.counter_stack >= 10 then
-        if love.math.random() < a.counter_rate then
-            local dmg = damage.calc(a,b)
-            b.hp = b.hp - dmg
-            a.counter_stack = 0
-        end
+    if a.counter_ready and love.math.random() < a.counter_rate then
+        local dmg = damage.calc(a,b)
+        applyDamage(a, b, "counter", dmg)
+        a.counter_ready = false
+        status.onDamaged(b)
+        resolveStunLogs(b)
     end
 end
 
@@ -100,27 +146,36 @@ function execute(a,b)
 
     if a.action=="attack" then
         local dmg=damage.calc(a,b)
-        b.hp=b.hp-dmg
+        applyDamage(a, b, "attack", dmg)
         status.onHit(a,b)
+        status.onDamaged(b)
+        if b.stunned and b.energy < 90 then b.energy = 90 end
+        resolveStunLogs(b)
+        addCounterGauge(b)
         a.special=a.special+10
         b.special=b.special+10
     end
 
     if a.action=="quick" then
         local dmg=damage.calc(a,b)*0.5
-        b.hp=b.hp-dmg
+        applyDamage(a, b, "quick", dmg)
         status.onHit(a,b)
+        status.onDamaged(b)
+        if b.stunned and b.energy < 90 then b.energy = 90 end
+        resolveStunLogs(b)
+        addCounterGauge(b)
         a.special=a.special+10
         b.special=b.special+10
     end
 
     if a.action=="special" then
         local dmg=damage.calc(a,b)*2
-        b.hp=b.hp-dmg
+        applyDamage(a, b, "special", dmg)
+        status.onDamaged(b)
+        if b.stunned and b.energy < 90 then b.energy = 90 end
+        resolveStunLogs(b)
+        addCounterGauge(b)
     end
-
-    -- カウンター加算
-    b.counter_stack = b.counter_stack + 1
     counterCheck(b,a)
 
     a.energy=0
@@ -141,11 +196,24 @@ end
 function M.load()
     hero=createUnit(enemies.hero)
     enemy=createUnit(enemies.enemy)
+    actionLogs = {}
+    battleEnded = false
+    battleResult = nil
 end
 
 function M.update(dt)
+    if battleEnded then return end
     updateUnit(hero,enemy)
+    if enemy.hp <= 0 then
+        battleEnded = true
+        battleResult = "You Win"
+        return
+    end
     updateUnit(enemy,hero)
+    if hero.hp <= 0 then
+        battleEnded = true
+        battleResult = "You Lose"
+    end
 end
 
 function drawGauge(x,y,v)
@@ -154,7 +222,7 @@ function drawGauge(x,y,v)
 end
 
 function drawUnit(u,x,y)
-    love.graphics.print(u.name.." "..u.hp,x,y)
+    love.graphics.print(u.name.." "..math.floor(u.hp),x,y)
 
     local i=0
     for k,v in pairs(u.status) do
@@ -164,6 +232,7 @@ function drawUnit(u,x,y)
     end
 
     love.graphics.print("SP "..u.special,x,y+100)
+    love.graphics.print("CT "..u.counter_gauge,x,y+115)
 end
 
 function M.draw()
@@ -171,10 +240,13 @@ function M.draw()
     drawUnit(hero,40,40)
     drawUnit(enemy,220,40)
 
-    if hero.hp<=0 then
-        love.graphics.print("Enemy Wins",120,200)
-    elseif enemy.hp<=0 then
-        love.graphics.print("Hero Wins",120,200)
+    if battleResult then
+        love.graphics.print(battleResult,120,200)
+    end
+
+    love.graphics.print("Action Log",20,240)
+    for i, log in ipairs(actionLogs) do
+        love.graphics.print(log,20,240 + i * 14)
     end
 end
 
