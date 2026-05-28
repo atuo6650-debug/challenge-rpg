@@ -2,9 +2,11 @@
 
 return {
     heal={
-        regen=5
+        regen=5,
+        counter_gain=10
     },
     counter={
-        counter=true
+        counter=true,
+        counter_gain=30
     }
 }

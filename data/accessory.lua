@@ -11,6 +11,6 @@ return {
     },
 
     finisher={
-        special={condition="stun"}
+        special={condition="wait_stunned"}
     }
 }

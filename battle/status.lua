@@ -22,12 +22,19 @@ function M.onHit(a, b)
         if v >= 100 then
             b.status[k] = 0
 
-            if k=="stun" then b.stunned=true end
+            if k=="stun" then b.stunned=true b.just_stunned=true end
             if k=="poison" then b.hp=b.hp-5 end
             if k=="burn" then b.hp=b.hp-8 end
-            if k=="freeze" then b.stunned=true end
+            if k=="freeze" then b.stunned=true b.just_stunned=true end
             if k=="shock" then b.energy=0 end
         end
+    end
+end
+
+function M.onDamaged(u)
+    if u.stunned then
+        u.stunned = false
+        u.just_recovered = true
     end
 end
 

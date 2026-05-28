@@ -10,7 +10,7 @@ function M.calc(a,b)
         dmg = dmg * (1 - b.damage_cut)
     end
 
-    return math.floor(dmg)
+    return math.floor(dmg + 0.5)
 end
 
 return M
