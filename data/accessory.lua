@@ -12,5 +12,9 @@ return {
 
     finisher={
         special={condition="wait_stunned"}
+    },
+
+    final_action={
+        special={condition="final_action"}
     }
 }

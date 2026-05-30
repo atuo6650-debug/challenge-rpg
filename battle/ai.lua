@@ -18,7 +18,7 @@ function M.decide(u, target)
             return
         end
 
-        if u.special_condition == "wait_stunned" then
+        if u.special_condition == "wait_stunned" or u.special_condition == "final_action" then
             return
         end
 

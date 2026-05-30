@@ -27,7 +27,7 @@ end
 
 local function applyDamage(attacker, target, actionName, rawDamage)
     local dmg = math.max(1, math.floor(rawDamage + 0.5))
-    target.hp = math.max(0, math.floor(target.hp - dmg))
+    target.hp = math.floor(target.hp - dmg)
     addLog(string.format("%s | %s | %s | %d", attacker.name, actionName, target.name, dmg))
     return dmg
 end
@@ -42,6 +42,23 @@ local function resolveStunLogs(unit)
         unit.just_recovered = false
     end
 end
+
+local function tryFinalAction(unit)
+    if unit.special_condition ~= "final_action" then return false end
+    if unit.final_action_used then return false end
+    if unit.special < 100 then return false end
+    if unit.hp >= 0 then return false end
+
+    unit.final_action_used = true
+    unit.special = 0
+    unit.hp = math.max(1, math.floor(unit.maxhp * 0.1 + 0.5))
+    unit.energy = actions.final_action.cost
+    unit.action = nil
+    unit.cost = 0
+    addLog(string.format("%s | final_action | %s | %d", unit.name, unit.name, unit.hp))
+    return true
+end
+
 
 local function addCounterGauge(unit)
     local gain = 10
@@ -80,6 +97,8 @@ function createUnit(data)
     u.resist={stun=0,poison=0,burn=0,freeze=0,shock=0}
 
     u.stunned=false
+    u.stun_energy=0
+    u.final_action_used=false
 
     -- 装備
     u.w1=weapons[data.w1]
@@ -126,7 +145,7 @@ function createUnit(data)
 end
 
 function counterCheck(a,b)
-    if a.counter_ready and love.math.random() < a.counter_rate then
+    if a.hp > 0 and a.counter_ready and love.math.random() < a.counter_rate then
         local dmg = damage.calc(a,b)
         applyDamage(a, b, "counter", dmg)
         a.counter_ready = false
@@ -137,19 +156,11 @@ end
 
 function execute(a,b)
 
-    if a.stunned then
-        a.stunned=false
-        a.energy=0
-        a.action=nil
-        return
-    end
-
     if a.action=="attack" then
         local dmg=damage.calc(a,b)
         applyDamage(a, b, "attack", dmg)
-        status.onHit(a,b)
         status.onDamaged(b)
-        if b.stunned and b.energy < 90 then b.energy = 90 end
+        status.onHit(a,b)
         resolveStunLogs(b)
         addCounterGauge(b)
         a.special=a.special+10
@@ -159,9 +170,8 @@ function execute(a,b)
     if a.action=="quick" then
         local dmg=damage.calc(a,b)*0.5
         applyDamage(a, b, "quick", dmg)
-        status.onHit(a,b)
         status.onDamaged(b)
-        if b.stunned and b.energy < 90 then b.energy = 90 end
+        status.onHit(a,b)
         resolveStunLogs(b)
         addCounterGauge(b)
         a.special=a.special+10
@@ -172,7 +182,6 @@ function execute(a,b)
         local dmg=damage.calc(a,b)*2
         applyDamage(a, b, "special", dmg)
         status.onDamaged(b)
-        if b.stunned and b.energy < 90 then b.energy = 90 end
         resolveStunLogs(b)
         addCounterGauge(b)
     end
@@ -184,7 +193,13 @@ end
 
 function updateUnit(a,b)
 
+    if status.updateStun(a, 10) then
+        resolveStunLogs(a)
+        return
+    end
+
     ai.decide(a,b)
+    if not a.action then return end
 
     a.energy = a.energy + 10
 
@@ -204,15 +219,30 @@ end
 function M.update(dt)
     if battleEnded then return end
     updateUnit(hero,enemy)
+    tryFinalAction(hero)
+    tryFinalAction(enemy)
     if enemy.hp <= 0 then
         battleEnded = true
         battleResult = "You Win"
         return
     end
-    updateUnit(enemy,hero)
     if hero.hp <= 0 then
         battleEnded = true
         battleResult = "You Lose"
+        return
+    end
+
+    updateUnit(enemy,hero)
+    tryFinalAction(hero)
+    tryFinalAction(enemy)
+    if hero.hp <= 0 then
+        battleEnded = true
+        battleResult = "You Lose"
+        return
+    end
+    if enemy.hp <= 0 then
+        battleEnded = true
+        battleResult = "You Win"
     end
 end
 
