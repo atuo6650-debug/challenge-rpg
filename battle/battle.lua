@@ -47,7 +47,7 @@ local function tryFinalAction(unit)
     if unit.special_condition ~= "final_action" then return false end
     if unit.final_action_used then return false end
     if unit.special < 100 then return false end
-    if unit.hp >= 0 then return false end
+    if unit.hp > 0 then return false end
 
     unit.final_action_used = true
     unit.special = 0
@@ -72,7 +72,6 @@ local function addCounterGauge(unit)
     unit.counter_gauge = unit.counter_gauge + gain
     if unit.counter_gauge >= 100 then
         unit.counter_ready = true
-        unit.counter_gauge = unit.counter_gauge - 100
     end
 end
 
@@ -145,10 +144,11 @@ function createUnit(data)
 end
 
 function counterCheck(a,b)
-    if a.hp > 0 and a.counter_ready and love.math.random() < a.counter_rate then
+    if a.hp > 0 and a.counter_ready and a.counter_gauge >= 100 and love.math.random() < a.counter_rate then
         local dmg = damage.calc(a,b)
         applyDamage(a, b, "counter", dmg)
-        a.counter_ready = false
+        a.counter_gauge = a.counter_gauge - 100
+        a.counter_ready = a.counter_gauge >= 100
         status.onDamaged(b)
         resolveStunLogs(b)
     end
