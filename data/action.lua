@@ -1,8 +1,7 @@
 
-
 return {
-    attack={cost=90},
-    quick={cost=60},
     defense={cost=50},
-    final_action={cost=30}
+    final_action={cost=30},
+    counter={cost=30},
+    special={cost=0}
 }
