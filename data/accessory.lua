@@ -1,9 +1,9 @@
 
-
 return {
 
     poison_ring={
-        inflict={type="poison",value=20}
+        inflict={type="poison",value=20},
+        special={condition="stun",weapon_type="any"}
     },
 
     stun_guard={
@@ -11,10 +11,26 @@ return {
     },
 
     finisher={
-        special={condition="wait_stunned"}
+        special={condition="wait_stunned",weapon_type="any"}
     },
 
     final_action={
-        special={condition="final_action"}
+        special={condition="final_action",weapon_type="any"}
+    },
+
+    sword_special={
+        special={condition="stun",weapon_type="sword"}
+    },
+
+    dagger_special={
+        special={condition="stun",weapon_type="dagger"}
+    },
+
+    staff_special={
+        special={condition="stun",weapon_type="staff"}
+    },
+
+    book_special={
+        special={condition="stun",weapon_type="book"}
     }
 }
