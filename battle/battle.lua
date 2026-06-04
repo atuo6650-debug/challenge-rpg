@@ -1,4 +1,3 @@
-
 local damage = require("battle.damage")
 local status = require("battle.status")
 local ai = require("battle.ai")
@@ -24,39 +23,6 @@ local function addLog(text)
     end
 end
 
-local function refreshGaugeTotals(unit)
-    local special = 0
-    for _, gauge in ipairs(unit.special_gauges or {}) do
-        special = special + gauge.value
-    end
-    unit.special = special
-
-    local counter = 0
-    for _, gauge in ipairs(unit.counter_gauges or {}) do
-        counter = counter + gauge.value
-    end
-    unit.counter_gauge = counter
-end
-
-local function reduceGauge(gauges, amount)
-    local remaining = amount
-    table.sort(gauges, function(a, b) return a.value > b.value end)
-
-    for _, gauge in ipairs(gauges) do
-        if remaining <= 0 then break end
-        local spent = math.min(gauge.value, remaining)
-        gauge.value = gauge.value - spent
-        remaining = remaining - spent
-    end
-end
-
-local function random()
-    if love and love.math and love.math.random then
-        return love.math.random()
-    end
-    return math.random()
-end
-
 local function weaponTypeEquipped(unit, weaponType)
     if weaponType == "any" then return true end
 
@@ -67,6 +33,39 @@ local function weaponTypeEquipped(unit, weaponType)
     end
 
     return false
+end
+
+
+local function equippedWeaponByType(unit, weaponType)
+    if weaponType == "any" then return nil end
+
+    for _, weapon in pairs({unit.w1, unit.w2}) do
+        if weapon and weapon.type == weaponType then
+            return weapon
+        end
+    end
+
+    return nil
+end
+
+local function specialWeapon(unit, target)
+    local gauge = unit.pending_special_gauge
+    if gauge then
+        local weapon = equippedWeaponByType(unit, gauge.weapon_type or "any")
+        if weapon then return weapon end
+    end
+
+    if target.stunned and unit.w2 and unit.w2.condition == "wait_stunned" then
+        return unit.w2
+    end
+
+    return unit.pending_weapon or unit.pattern[unit.patternIndex] or weapons.sword
+end
+
+local function canEquipWeapon(slot, weapon)
+    if not weapon then return false end
+    if weapon.second_only and slot ~= 2 then return false end
+    return true
 end
 
 local function applyDamage(attacker, target, actionName, rawDamage)
@@ -87,45 +86,26 @@ local function resolveStunLogs(unit)
     end
 end
 
-local function readySpecialGauge(unit, condition)
-    for _, gauge in ipairs(unit.special_gauges or {}) do
-        if gauge.value >= 100 and (not condition or gauge.condition == condition) then
-            return gauge
-        end
-    end
-
-    return nil
-end
-
 local function tryFinalAction(unit)
     if unit.final_action_used then return false end
-    if not readySpecialGauge(unit, "final_action") then return false end
     if unit.hp > 0 then return false end
 
+    local gauge = status.readySpecialGauge(unit, function(g)
+        return g.condition == "final_action"
+    end)
+    if not gauge then return false end
+
     unit.final_action_used = true
-    unit.consumeSpecial(100)
+    status.consumeGauge(gauge, 100)
+    unit.refreshGaugeTotals()
     unit.hp = math.max(1, math.floor(unit.maxhp * 0.1 + 0.5))
     unit.energy = actions.final_action.cost
     unit.action = nil
     unit.cost = 0
+    unit.wait = actions.final_action.wait
     unit.action_started = false
     addLog(string.format("%s | final_action | %s | %d", unit.name, unit.name, unit.hp))
     return true
-end
-
-local function addSpecialGauge(unit, gain)
-    for _, gauge in ipairs(unit.special_gauges or {}) do
-        gauge.value = math.min(100, gauge.value + gain)
-    end
-    refreshGaugeTotals(unit)
-end
-
-local function addCounterGauge(unit)
-    for _, gauge in ipairs(unit.counter_gauges or {}) do
-        local gain = gauge.gain or 10
-        gauge.value = math.min(100, gauge.value + gain)
-    end
-    refreshGaugeTotals(unit)
 end
 
 local function performAttack(attacker, target, actionName, weapon, multiplier)
@@ -135,9 +115,23 @@ local function performAttack(attacker, target, actionName, weapon, multiplier)
     status.onDamaged(target)
     status.onHit(attacker, target)
     resolveStunLogs(target)
-    addCounterGauge(target)
-    addSpecialGauge(attacker, 10)
-    addSpecialGauge(target, 10)
+    status.addCounterGauge(target)
+    status.addSpecialGauge(attacker, 10)
+    status.addSpecialGauge(target, 10)
+end
+
+local function startCooldown(unit)
+    unit.action_started = true
+    unit.energy = 0
+
+    if (unit.wait or 0) <= 0 then
+        unit.action = nil
+        unit.pending_weapon = nil
+        unit.pending_special_gauge = nil
+        unit.cost = 0
+        unit.wait = 0
+        unit.action_started = false
+    end
 end
 
 local function performCounterAttack(attacker, target)
@@ -147,8 +141,8 @@ local function performCounterAttack(attacker, target)
     performAttack(attacker, target, "counter_" .. item.weapon.type, item.weapon)
     attacker.action = "counter_wait"
     attacker.cost = actions.counter.cost
-    attacker.energy = 0
-    attacker.action_started = true
+    attacker.wait = actions.counter.wait
+    startCooldown(attacker)
     return true
 end
 
@@ -159,13 +153,13 @@ local function startCounterSequence(unit, target)
 
     local queued = 0
     for _, gauge in ipairs(unit.counter_gauges) do
-        if gauge.value >= 100 and random() < unit.counter_rate then
+        if gauge.value >= 100 then
             gauge.value = gauge.value - 100
             table.insert(unit.counter_queue, {weapon=gauge.weapon})
             queued = queued + 1
         end
     end
-    refreshGaugeTotals(unit)
+    unit.refreshGaugeTotals()
 
     if queued == 0 then return end
 
@@ -173,13 +167,12 @@ local function startCounterSequence(unit, target)
         unit.saved_action = {
             action=unit.action,
             pending_weapon=unit.pending_weapon,
+            pending_special_gauge=unit.pending_special_gauge,
             cost=unit.cost,
+            wait=unit.wait,
             energy=unit.energy,
             action_started=unit.action_started
         }
-    end
-
-    if unit.action ~= "counter_wait" then
         performCounterAttack(unit, target)
     end
 end
@@ -188,7 +181,7 @@ local function finishCounterIfReady(unit)
     if unit.action ~= "counter_wait" then return false end
 
     unit.energy = unit.energy + 10
-    if unit.energy < unit.cost then
+    if unit.energy < unit.wait then
         return true
     end
 
@@ -200,12 +193,26 @@ local function finishCounterIfReady(unit)
     local saved = unit.saved_action or {}
     unit.action = saved.action
     unit.pending_weapon = saved.pending_weapon
+    unit.pending_special_gauge = saved.pending_special_gauge
     unit.cost = saved.cost or 0
+    unit.wait = saved.wait or 0
     unit.energy = saved.energy or 0
     unit.action_started = saved.action_started
     unit.saved_action = nil
     unit.counter_target = nil
     return true
+end
+
+local function addWeaponPattern(pattern, weapon)
+    if not weapon then return end
+
+    local repeatCount = weapon.repeat_count
+    if repeatCount == nil then repeatCount = 1 end
+    weapon.pattern_repeat_count = repeatCount
+
+    for _ = 1, repeatCount do
+        table.insert(pattern, weapon)
+    end
 end
 
 function createUnit(data)
@@ -221,25 +228,19 @@ function createUnit(data)
     u.energy=0
     u.action=nil
     u.cost=0
+    u.wait=0
     u.action_started=false
 
     u.special=0
     u.special_condition=data.special_condition
 
-    u.status={stun=0,blind=0,silence=0,curse=0,paralysis=0,poison=0,burn=0,freeze=0,shock=0}
-    u.resist={stun=0,blind=0,silence=0,curse=0,paralysis=0,poison=0,burn=0,freeze=0,shock=0}
-
-    u.stunned=false
-    u.stun_energy=0
-    u.blinded=false
-    u.blind_energy=0
-    u.silenced=false
-    u.silence_energy=0
-    u.final_action_used=false
+    status.initStatuses(u)
 
     -- 装備
-    u.w1=weapons[data.w1]
-    u.w2=weapons[data.w2]
+    local w1 = weapons[data.w1]
+    local w2 = weapons[data.w2]
+    u.w1 = canEquipWeapon(1, w1) and w1 or nil
+    u.w2 = canEquipWeapon(2, w2) and w2 or nil
     u.a1=armors[data.a1]
     u.a2=armors[data.a2]
     u.acc1=accs[data.acc1]
@@ -247,16 +248,16 @@ function createUnit(data)
 
     -- パターン
     u.pattern={}
-    if u.w1 then table.insert(u.pattern, u.w1) end
-    if u.w2 then table.insert(u.pattern, u.w2) end
+    addWeaponPattern(u.pattern, u.w1)
+    addWeaponPattern(u.pattern, u.w2)
 
-    if #u.pattern==0 then table.insert(u.pattern,weapons.sword) end
+    if #u.pattern==0 then addWeaponPattern(u.pattern,weapons.sword) end
     u.patternIndex=1
 
     -- アクセ適用
     for _,acc in pairs({u.acc1,u.acc2}) do
         if acc then
-            if acc.resist then
+            if acc.resist and u.resist[acc.resist.type] ~= nil then
                 u.resist[acc.resist.type] = acc.resist.value
             end
             if acc.inflict then
@@ -280,7 +281,6 @@ function createUnit(data)
         end
     end
     u.counter_queue={}
-    u.counter_rate=data.counter_rate or 0.5
 
     -- 特殊ゲージ（アクセサリーに応じて0〜2本）
     u.special_gauges={}
@@ -297,22 +297,23 @@ function createUnit(data)
         end
     end
 
+    function u.refreshGaugeTotals()
+        status.refreshGaugeTotals(u)
+    end
+
     function u.consumeSpecial(amount)
-        reduceGauge(u.special_gauges, amount)
-        refreshGaugeTotals(u)
+        status.consumeSpecial(u, amount)
     end
 
     function u.reduceSpecial(amount)
-        reduceGauge(u.special_gauges, amount)
-        refreshGaugeTotals(u)
+        status.reduceSpecial(u, amount)
     end
 
     function u.reduceCounter(amount)
-        reduceGauge(u.counter_gauges, amount)
-        refreshGaugeTotals(u)
+        status.reduceCounter(u, amount)
     end
 
-    refreshGaugeTotals(u)
+    u.refreshGaugeTotals()
 
     return u
 end
@@ -322,22 +323,19 @@ function execute(a,b)
     if a.action=="weapon" then
         performAttack(a, b, a.pending_weapon.type, a.pending_weapon)
         startCounterSequence(b, a)
-        a.action_started = true
-        a.energy = 0
+        startCooldown(a)
         return
     end
 
     if a.action=="special" then
-        local weapon = a.pending_weapon or a.pattern[a.patternIndex] or weapons.sword
+        local weapon = specialWeapon(a, b)
         local dmg=damage.calc(a,b,weapon.damage_type)*2
         applyDamage(a, b, "special", dmg)
         status.onDamaged(b)
         resolveStunLogs(b)
-        addCounterGauge(b)
+        status.addCounterGauge(b)
         startCounterSequence(b, a)
-        a.energy=0
-        a.action=nil
-        a.action_started=false
+        startCooldown(a)
         return
     end
 end
@@ -360,22 +358,23 @@ function updateUnit(a,b)
     ai.decide(a,b)
     if not a.action then return end
 
-    if a.action == "weapon" and not a.action_started then
-        execute(a,b)
-        return
-    end
-
-    if a.action == "special" then
-        execute(a,b)
+    if not a.action_started then
+        a.energy = a.energy + 10
+        if a.energy >= a.cost then
+            execute(a,b)
+        end
         return
     end
 
     a.energy = a.energy + 10
 
-    if a.energy >= a.cost then
+    if a.energy >= a.wait then
         a.energy=0
         a.action=nil
         a.pending_weapon=nil
+        a.pending_special_gauge=nil
+        a.cost=0
+        a.wait=0
         a.action_started=false
     end
 end
@@ -427,7 +426,8 @@ function drawUnit(u,x,y)
     love.graphics.print(u.name.." "..math.floor(u.hp),x,y)
 
     local i=0
-    for k,v in pairs(u.status) do
+    for _, k in ipairs(status.statusNames()) do
+        local v = u.status[k] or 0
         love.graphics.print(k,x,y+20+i*12)
         drawGauge(x+60,y+20+i*12,v)
         i=i+1

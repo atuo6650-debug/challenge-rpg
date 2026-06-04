@@ -1,8 +1,11 @@
-
 return {
 
-    poison_ring={
-        inflict={type="poison",value=20},
+    goggles={
+        resist={type="blind",value=0.5}
+    },
+
+    flash={
+        inflict={type="blind",value=20},
         special={condition="stun",weapon_type="any"}
     },
 
