@@ -1,3 +1,4 @@
+-- battle/ai.lua: 戦闘中ユニットの次アクション選択ロジックを担当する責務。
 local actions = require("data.action")
 
 local M = {}

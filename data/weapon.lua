@@ -1,3 +1,4 @@
+-- data/weapon.lua: 武器定義データを提供する責務。
 return {
     sword={type="sword",damage_type="physical",wait=90,power=1.0, repeat_count=2},
     dagger={type="dagger",damage_type="physical",wait=60,power=0.5, repeat_count=1},

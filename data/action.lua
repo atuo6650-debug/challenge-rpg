@@ -1,3 +1,4 @@
+-- data/action.lua: 武器種別などに対応する行動コスト・待機時間データを提供する責務。
 local M = {
     weapon = {
         physical = {

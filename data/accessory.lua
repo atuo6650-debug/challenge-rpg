@@ -1,3 +1,4 @@
+-- data/accessory.lua: アクセサリー定義データを提供する責務。
 return {
 
     goggles={

@@ -1,3 +1,4 @@
+-- dungeon/base.lua: ダンジョン探索の暫定実装、マップ生成、敵配置、戦闘遷移、描画を管理する責務。
 local battle = require("battle.battle")
 local status = require("battle.status")
 local enemies = require("data.enemy")
