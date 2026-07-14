@@ -1,14 +1,17 @@
-
-local battle = require("battle.battle")
+local dungeon = require("dungeon")
 
 function love.load()
-    battle.load()
+    dungeon.load()
 end
 
 function love.update(dt)
-    battle.update(dt)
+    dungeon.update(dt)
+end
+
+function love.keypressed(key)
+    dungeon.keypressed(key)
 end
 
 function love.draw()
-    battle.draw()
+    dungeon.draw()
 end

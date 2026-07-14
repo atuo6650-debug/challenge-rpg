@@ -73,6 +73,32 @@ function M.initStatuses(u)
     u.final_action_used = false
 end
 
+function M.clearStatusGauges(u)
+    for _, name in ipairs(ACTIVE_STATUSES) do
+        u.status[name] = 0
+    end
+
+    u.stunned = false
+    u.stun_energy = 0
+    u.blinded = false
+    u.blind_energy = 0
+    u.silenced = false
+    u.silence_energy = 0
+    u.just_stunned = false
+    u.just_recovered = false
+end
+
+function M.clearBattleGauges(u)
+    for _, gauge in ipairs(u.counter_gauges or {}) do
+        gauge.value = 0
+    end
+    for _, gauge in ipairs(u.special_gauges or {}) do
+        gauge.value = 0
+        gauge.consumed = false
+    end
+    M.refreshGaugeTotals(u)
+end
+
 function M.refreshGaugeTotals(unit)
     local special = 0
     for _, gauge in ipairs(unit.special_gauges or {}) do
@@ -133,6 +159,8 @@ function M.consumeGauge(gauge, amount)
 end
 
 function M.onHit(a, b)
+    b.stun_changed_on_hit = nil
+
     -- 状態異常付与（アクセ）
     if a.inflict then
         add(b, a.inflict.type, a.inflict.value, b.resist[a.inflict.type])
@@ -146,7 +174,7 @@ function M.onHit(a, b)
         if v >= 100 then
             b.status[k] = 0
 
-            if k=="stun" then startStun(b) end
+            if k=="stun" then startStun(b); b.stun_changed_on_hit = "started" end
             if k=="blind" then startTimedStatus(b, "blind") end
             if k=="silence" then startTimedStatus(b, "silence") end
             if k=="curse" and b.reduceSpecial then b.reduceSpecial(50) end
@@ -156,7 +184,11 @@ function M.onHit(a, b)
 end
 
 function M.onDamaged(u)
+    local wasStunned = u.stunned
     clearStun(u)
+    if wasStunned then
+        u.stun_changed_on_hit = "cleared"
+    end
 end
 
 function M.updateStun(u, energyGain)
