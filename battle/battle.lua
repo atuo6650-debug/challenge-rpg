@@ -15,6 +15,7 @@ local actionLogs = {}
 local MAX_LOGS = 12
 local battleEnded = false
 local battleResult = nil
+local onBattleEnd = nil
 
 local function addLog(text)
     table.insert(actionLogs, text)
@@ -115,9 +116,14 @@ local function performAttack(attacker, target, actionName, weapon, multiplier)
     status.onDamaged(target)
     status.onHit(attacker, target)
     resolveStunLogs(target)
-    status.addCounterGauge(target)
+    local counterAllowed = target.stun_changed_on_hit ~= "started"
+    if counterAllowed then
+        status.addCounterGauge(target)
+    end
+    target.stun_changed_on_hit = nil
     status.addSpecialGauge(attacker, 10)
     status.addSpecialGauge(target, 10)
+    return counterAllowed
 end
 
 local function startCooldown(unit)
@@ -318,11 +324,15 @@ function createUnit(data)
     return u
 end
 
+M.createUnit = createUnit
+
 function execute(a,b)
 
     if a.action=="weapon" then
-        performAttack(a, b, a.pending_weapon.type, a.pending_weapon)
-        startCounterSequence(b, a)
+        local counterAllowed = performAttack(a, b, a.pending_weapon.type, a.pending_weapon)
+        if counterAllowed then
+            startCounterSequence(b, a)
+        end
         startCooldown(a)
         return
     end
@@ -333,7 +343,10 @@ function execute(a,b)
         applyDamage(a, b, "special", dmg)
         status.onDamaged(b)
         resolveStunLogs(b)
-        status.addCounterGauge(b)
+        if b.stun_changed_on_hit ~= "started" then
+            status.addCounterGauge(b)
+        end
+        b.stun_changed_on_hit = nil
         startCounterSequence(b, a)
         startCooldown(a)
         return
@@ -385,6 +398,26 @@ function M.load()
     actionLogs = {}
     battleEnded = false
     battleResult = nil
+    onBattleEnd = nil
+end
+
+function M.start(playerUnit, enemyUnit, callback)
+    hero = playerUnit or createUnit(enemies.hero)
+    enemy = enemyUnit or createUnit(enemies.enemy)
+    actionLogs = {}
+    battleEnded = false
+    battleResult = nil
+    onBattleEnd = callback
+end
+
+local function finishBattle(result)
+    battleEnded = true
+    battleResult = result
+    status.clearBattleGauges(hero)
+    status.clearBattleGauges(enemy)
+    if onBattleEnd then
+        onBattleEnd(result)
+    end
 end
 
 function M.update(dt)
@@ -393,13 +426,11 @@ function M.update(dt)
     tryFinalAction(hero)
     tryFinalAction(enemy)
     if enemy.hp <= 0 then
-        battleEnded = true
-        battleResult = "You Win"
+        finishBattle("You Win")
         return
     end
     if hero.hp <= 0 then
-        battleEnded = true
-        battleResult = "You Lose"
+        finishBattle("You Lose")
         return
     end
 
@@ -407,13 +438,11 @@ function M.update(dt)
     tryFinalAction(hero)
     tryFinalAction(enemy)
     if hero.hp <= 0 then
-        battleEnded = true
-        battleResult = "You Lose"
+        finishBattle("You Lose")
         return
     end
     if enemy.hp <= 0 then
-        battleEnded = true
-        battleResult = "You Win"
+        finishBattle("You Win")
     end
 end
 
