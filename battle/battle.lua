@@ -1,3 +1,4 @@
+-- battle/battle.lua: 戦闘ループ、ユニット生成、行動解決、戦闘描画を管理する責務。
 local damage = require("battle.damage")
 local status = require("battle.status")
 local ai = require("battle.ai")

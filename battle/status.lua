@@ -1,3 +1,4 @@
+-- battle/status.lua: スタンや盲目などの状態異常、特殊・カウンターゲージを管理する責務。
 local M = {}
 
 local STATUS_DURATION_ENERGY = 90

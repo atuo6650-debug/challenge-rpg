@@ -1,3 +1,4 @@
+-- data/armor.lua: 防具定義データを提供する責務。
 
 return {
     heal={
