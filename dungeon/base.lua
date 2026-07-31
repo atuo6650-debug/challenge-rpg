@@ -2,6 +2,8 @@
 local battle = require("battle.battle")
 local status = require("battle.status")
 local enemies = require("data.enemy")
+local fieldUi = require("ui.field_ui")
+local town = require("town.town")
 
 local M = {}
 
@@ -16,6 +18,8 @@ local rooms = {}
 local player = nil
 local dungeonEnemies = {}
 local mode = "dungeon"
+local currentDistrict = "grass"
+local entrancePosition = nil
 
 local aiTypes = {
     SEE_PLAYER = "see_player",
@@ -180,8 +184,13 @@ end
 local function startBattle(enemyActor)
     mode = "battle"
     battle.start(player.unit, enemyActor.unit, function(result)
-        if result == "You Win" then enemyActor.alive = false end
-        mode = "dungeon"
+        if result == "You Win" then
+            enemyActor.alive = false
+            mode = "dungeon"
+        elseif result == "You Lose" then
+            town.returnToTown(currentDistrict, player.unit, "defeat")
+            mode = "town"
+        end
     end)
 end
 
@@ -199,7 +208,8 @@ function M.load()
     math.randomseed(os.time())
     generateMap()
     local px, py = centerOf(rooms[1])
-    player = {x = px, y = py, unit = battle.createUnit(enemies.hero)}
+    entrancePosition = {x = px, y = py}
+    player = {x = px, y = py, district = currentDistrict, unit = battle.createUnit(enemies.hero)}
     status.clearStatusGauges(player.unit)
 
     dungeonEnemies = {}
@@ -211,10 +221,20 @@ function M.load()
         unit.name = unit.name .. i
         table.insert(dungeonEnemies, {x = ex, y = ey, unit = unit, alive = true, aiType = enemyAi[math.random(#enemyAi)], patrolDir = i})
     end
+    fieldUi.configure({
+        {label = "拠点へ戻る", execute = function()
+            town.returnToTown(currentDistrict, player.unit)
+            mode = "town"
+        end},
+        {label = "ダンジョン入口へ戻る", execute = function()
+            M.returnToEntrance()
+        end}
+    })
     mode = "dungeon"
 end
 
 function M.update(dt)
+    if mode == "town" then return end
     if mode == "battle" then
         battle.update(dt)
         return
@@ -223,7 +243,18 @@ function M.update(dt)
 end
 
 function M.keypressed(key)
+    if mode == "town" then
+        if key == "return" or key == "kpenter" then
+            M.returnToEntrance()
+        end
+        return
+    end
     if mode ~= "dungeon" then return end
+    if key == "escape" or key == "m" then
+        fieldUi.toggle()
+        return
+    end
+    if fieldUi.keypressed(key) then return end
     local moved = false
     if key == "up" or key == "w" then moved = tryMove(player, 0, -1) end
     if key == "down" or key == "s" then moved = tryMove(player, 0, 1) end
@@ -235,9 +266,6 @@ function M.keypressed(key)
         end
         checkEncounter()
     end
-    if key == "escape" and player then
-        status.clearStatusGauges(player.unit)
-    end
 end
 
 local function drawTile(x, y, color)
@@ -246,6 +274,10 @@ local function drawTile(x, y, color)
 end
 
 function M.draw()
+    if mode == "town" then
+        town.draw()
+        return
+    end
     if mode == "battle" then
         battle.draw()
         return
@@ -268,6 +300,17 @@ function M.draw()
     love.graphics.setColor(1, 1, 1)
     love.graphics.print("Dungeon: arrow/WASD move, adjacent enemy starts battle", 10, mapHeight * TILE_SIZE + 8)
     love.graphics.print("Sight range: " .. sightRange .. " tiles", 10, mapHeight * TILE_SIZE + 24)
+    fieldUi.draw(player.unit)
+end
+
+function M.returnToEntrance()
+    if player and entrancePosition then
+        player.x = entrancePosition.x
+        player.y = entrancePosition.y
+        status.clearStatusGauges(player.unit)
+    end
+    fieldUi.close()
+    mode = "dungeon"
 end
 
 M.aiTypes = aiTypes

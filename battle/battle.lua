@@ -2,6 +2,7 @@
 local damage = require("battle.damage")
 local status = require("battle.status")
 local ai = require("battle.ai")
+local unitBuilder = require("unit.builder")
 
 local actions = require("data.action")
 local weapons = require("data.weapon")
@@ -227,10 +228,7 @@ function createUnit(data)
     local u = {}
 
     u.name=data.name
-    u.hp=data.hp
-    u.maxhp=data.hp
-    u.atk=data.atk
-    u.def=data.def
+    unitBuilder.applyBaseParameters(u, data)
 
     u.energy=0
     u.action=nil
@@ -402,9 +400,31 @@ function M.load()
     onBattleEnd = nil
 end
 
-function M.start(playerUnit, enemyUnit, callback)
+local function resetForCleanBattle(unit)
+    if not unit then return end
+    unit.hp = unit.maxhp
+    unit.energy = 0
+    unit.action = nil
+    unit.cost = 0
+    unit.wait = 0
+    unit.action_started = false
+    unit.pending_weapon = nil
+    unit.pending_special_gauge = nil
+    unit.saved_action = nil
+    unit.counter_target = nil
+    unit.counter_queue = {}
+    unit.final_action_used = false
+    status.clearStatusGauges(unit)
+    status.clearBattleGauges(unit)
+end
+
+function M.start(playerUnit, enemyUnit, callback, options)
     hero = playerUnit or createUnit(enemies.hero)
     enemy = enemyUnit or createUnit(enemies.enemy)
+    if not (options and options.keep_state) then
+        resetForCleanBattle(hero)
+        resetForCleanBattle(enemy)
+    end
     actionLogs = {}
     battleEnded = false
     battleResult = nil
