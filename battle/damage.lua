@@ -3,7 +3,18 @@
 local M = {}
 
 function M.calc(a,b,damageType)
-    local dmg = a.atk - b.def
+    local attack = a.atk or 0
+    local defense = b.def or 0
+
+    if damageType == "physical" then
+        attack = a.physical_atk or attack
+        defense = b.physical_def or defense
+    elseif damageType == "magic" then
+        attack = a.magic_atk or attack
+        defense = b.magic_def or defense
+    end
+
+    local dmg = attack - defense
     if dmg < 1 then dmg = 1 end
 
     if b.damage_cut then
