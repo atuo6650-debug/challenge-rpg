@@ -20,6 +20,8 @@ local dungeonEnemies = {}
 local mode = "dungeon"
 local currentDistrict = "grass"
 local entrancePosition = nil
+local stairsPosition = nil
+local currentFloor = 1
 
 local aiTypes = {
     SEE_PLAYER = "see_player",
@@ -129,6 +131,7 @@ end
 local function tryMove(actor, dx, dy)
     local nx, ny = actor.x + dx, actor.y + dy
     if not isFloor(nx, ny) or occupied(nx, ny, actor) then return false end
+    if actor ~= player and stairsPosition and stairsPosition.x == nx and stairsPosition.y == ny then return false end
     actor.x, actor.y = nx, ny
     return true
 end
@@ -194,6 +197,53 @@ local function startBattle(enemyActor)
     end)
 end
 
+local function placeStairs()
+    local room = rooms[#rooms] or rooms[1]
+    if not room then
+        stairsPosition = nil
+        return
+    end
+
+    local sx, sy = centerOf(room)
+    stairsPosition = {x = sx, y = sy}
+end
+
+local function createDungeonEnemies()
+    dungeonEnemies = {}
+    local enemyAi = {aiTypes.SEE_PLAYER, aiTypes.NEAR_PLAYER, aiTypes.PACK_HUNTER, aiTypes.PATROL_INNER}
+    for i = 1, 2 do
+        local room = rooms[#rooms - i + 1] or rooms[1]
+        local ex, ey = centerOf(room)
+        if stairsPosition and ex == stairsPosition.x and ey == stairsPosition.y then
+            local fallback = rooms[math.max(1, #rooms - i)] or rooms[1]
+            ex, ey = centerOf(fallback)
+        end
+        local unit = battle.createUnit(enemies.enemy)
+        unit.name = unit.name .. currentFloor .. "-" .. i
+        table.insert(dungeonEnemies, {x = ex, y = ey, unit = unit, alive = true, aiType = enemyAi[math.random(#enemyAi)], patrolDir = i})
+    end
+end
+
+local function descendStairs()
+    currentFloor = currentFloor + 1
+    generateMap()
+    local px, py = centerOf(rooms[1])
+    entrancePosition = {x = px, y = py}
+    player.x, player.y = px, py
+    player.district = currentDistrict
+    placeStairs()
+    createDungeonEnemies()
+    fieldUi.close()
+end
+
+local function checkStairs()
+    if stairsPosition and player.x == stairsPosition.x and player.y == stairsPosition.y then
+        descendStairs()
+        return true
+    end
+    return false
+end
+
 local function checkEncounter()
     for _, e in ipairs(dungeonEnemies) do
         if e.alive and distance(player, e) <= encounterDistance then
@@ -206,21 +256,14 @@ end
 
 function M.load()
     math.randomseed(os.time())
+    currentFloor = 1
     generateMap()
     local px, py = centerOf(rooms[1])
     entrancePosition = {x = px, y = py}
     player = {x = px, y = py, district = currentDistrict, unit = battle.createUnit(enemies.hero)}
     status.clearStatusGauges(player.unit)
-
-    dungeonEnemies = {}
-    local enemyAi = {aiTypes.SEE_PLAYER, aiTypes.NEAR_PLAYER, aiTypes.PACK_HUNTER, aiTypes.PATROL_INNER}
-    for i = 1, 2 do
-        local room = rooms[#rooms - i + 1] or rooms[1]
-        local ex, ey = centerOf(room)
-        local unit = battle.createUnit(enemies.enemy)
-        unit.name = unit.name .. i
-        table.insert(dungeonEnemies, {x = ex, y = ey, unit = unit, alive = true, aiType = enemyAi[math.random(#enemyAi)], patrolDir = i})
-    end
+    placeStairs()
+    createDungeonEnemies()
     fieldUi.configure({
         {label = "拠点へ戻る", execute = function()
             town.returnToTown(currentDistrict, player.unit)
@@ -260,7 +303,7 @@ function M.keypressed(key)
     if key == "down" or key == "s" then moved = tryMove(player, 0, 1) end
     if key == "left" or key == "a" then moved = tryMove(player, -1, 0) end
     if key == "right" or key == "d" then moved = tryMove(player, 1, 0) end
-    if moved and not checkEncounter() then
+    if moved and not checkStairs() and not checkEncounter() then
         for _, e in ipairs(dungeonEnemies) do
             if e.alive then updateEnemy(e) end
         end
@@ -293,12 +336,13 @@ function M.draw()
         end
     end
 
+    if stairsPosition then drawTile(stairsPosition.x, stairsPosition.y, {0.1, 0.75, 0.25}) end
     for _, e in ipairs(dungeonEnemies) do
         if e.alive then drawTile(e.x, e.y, {0.8, 0.15, 0.15}) end
     end
     drawTile(player.x, player.y, {0.15, 0.45, 0.95})
     love.graphics.setColor(1, 1, 1)
-    love.graphics.print("Dungeon: arrow/WASD move, adjacent enemy starts battle", 10, mapHeight * TILE_SIZE + 8)
+    love.graphics.print("Dungeon F" .. currentFloor .. ": arrow/WASD move, green stairs descends", 10, mapHeight * TILE_SIZE + 8)
     love.graphics.print("Sight range: " .. sightRange .. " tiles", 10, mapHeight * TILE_SIZE + 24)
     fieldUi.draw(player.unit)
 end

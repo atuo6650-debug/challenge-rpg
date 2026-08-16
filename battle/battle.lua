@@ -400,6 +400,11 @@ function M.load()
     onBattleEnd = nil
 end
 
+local function resetAttackPattern(unit)
+    if not unit then return end
+    unit.patternIndex = 1
+end
+
 local function resetForCleanBattle(unit)
     if not unit then return end
     unit.hp = unit.maxhp
@@ -414,6 +419,7 @@ local function resetForCleanBattle(unit)
     unit.counter_target = nil
     unit.counter_queue = {}
     unit.final_action_used = false
+    resetAttackPattern(unit)
     status.clearStatusGauges(unit)
     status.clearBattleGauges(unit)
 end
@@ -434,6 +440,10 @@ end
 local function finishBattle(result)
     battleEnded = true
     battleResult = result
+    if result == "You Win" then
+        resetAttackPattern(hero)
+        resetAttackPattern(enemy)
+    end
     status.clearBattleGauges(hero)
     status.clearBattleGauges(enemy)
     if onBattleEnd then
