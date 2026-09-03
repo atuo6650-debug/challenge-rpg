@@ -1,5 +1,7 @@
 -- ui/field_ui.lua: フィールド・ダンジョン探索中のHUD、フィールドメニューの描画と入力処理を担当する責務。
 local unitBuilder = require("unit.builder")
+local timeUI = require("ui.time")
+local worldTime = require("core.world_time")
 
 local M = {}
 
@@ -87,6 +89,13 @@ function M.draw(unit)
     love.graphics.rectangle("line", x, y, w, h)
 
     local cy = y + 16
+    
+    -- 世界時間から月日時刻を取得・表示
+    local seconds = worldTime.getSeconds()
+    local formattedTime = timeUI.formatDateTime(seconds)
+    cy = printLine(formattedTime, x + 16, cy)
+    cy = cy + 6
+    
     cy = printLine("フィールドメニュー", x + 16, cy)
     cy = cy + 6
 
