@@ -1,4 +1,7 @@
 -- town/town.lua: 町シーン全体の進行、施設遷移、町イベントを管理する責務。
+local timeUI = require("ui.time")
+local worldTime = require("core.world_time")
+
 local M = {}
 
 local currentDistrict = "grass"
@@ -24,9 +27,15 @@ end
 
 function M.draw()
     love.graphics.setColor(1, 1, 1)
-    love.graphics.print("Town - " .. currentDistrict, 40, 40)
-    love.graphics.print(message, 40, 64)
-    love.graphics.print("Enter: ダンジョン入口へ戻る", 40, 88)
+    
+    -- 世界時間から月日時刻を取得・表示
+    local seconds = worldTime.getSeconds()
+    local formattedTime = timeUI.formatDateTime(seconds)
+    
+    love.graphics.print(formattedTime, 40, 40)
+    love.graphics.print("Town - " .. currentDistrict, 40, 64)
+    love.graphics.print(message, 40, 88)
+    love.graphics.print("Enter: ダンジョン入口へ戻る", 40, 112)
 end
 
 return M
