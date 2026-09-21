@@ -1,5 +1,6 @@
 -- ui/field_ui.lua: フィールド・ダンジョン探索中のHUD、フィールドメニューの描画と入力処理を担当する責務。
 local unitBuilder = require("unit.builder")
+local timeUi = require("ui.time")
 
 local M = {}
 
@@ -74,9 +75,17 @@ local function printLine(text, x, y)
     return y + 16
 end
 
-function M.draw(unit)
+function M.draw(unit, totalSeconds)
     love.graphics.setColor(1, 1, 1)
     love.graphics.print("M/Esc: フィールドメニュー", 10, 10)
+
+    if totalSeconds then
+    love.graphics.print(
+        timeUi.formatDateTime(totalSeconds),
+        10,
+        26
+    )
+end
 
     if not menuOpen then return end
 

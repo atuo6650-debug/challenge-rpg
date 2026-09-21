@@ -4,6 +4,7 @@ local status = require("battle.status")
 local enemies = require("data.enemy")
 local fieldUi = require("ui.field_ui")
 local town = require("town.town")
+local state = require("core.state")
 
 local M = {}
 
@@ -344,7 +345,7 @@ function M.draw()
     love.graphics.setColor(1, 1, 1)
     love.graphics.print("Dungeon F" .. currentFloor .. ": arrow/WASD move, green stairs descends", 10, mapHeight * TILE_SIZE + 8)
     love.graphics.print("Sight range: " .. sightRange .. " tiles", 10, mapHeight * TILE_SIZE + 24)
-    fieldUi.draw(player.unit)
+    fieldUi.draw(player.unit, state.worldTime.totalSeconds)
 end
 
 function M.returnToEntrance()

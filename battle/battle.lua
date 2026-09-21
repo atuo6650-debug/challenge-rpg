@@ -10,6 +10,9 @@ local armors = require("data.armor")
 local accs = require("data.accessory")
 local enemies = require("data.enemy")
 
+local timeUi = require("ui.time")
+local state = require("core.state")
+
 local M = {}
 
 local hero, enemy
@@ -498,6 +501,12 @@ function drawUnit(u,x,y)
 end
 
 function M.draw()
+
+    love.graphics.print(
+        timeUi.formatTime(state.worldTime.totalSeconds),
+        20,
+        20
+    )
 
     drawUnit(hero,40,40)
     drawUnit(enemy,220,40)
