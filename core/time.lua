@@ -9,6 +9,27 @@ M.SECONDS_PER_MINUTE = 60
 M.SECONDS_PER_HOUR = 3600
 M.SECONDS_PER_DAY = 86400
 
+
+-- 共通tick
+-- 1 tick = 10秒
+-- 将来この値を変更することで、1 tick の長さを変更できる。
+M.SECONDS_PER_TICK = 10
+
+-- 秒をtickに変換
+-- @param seconds 秒数
+-- @return number tick数
+function M.secondsToTicks(seconds)
+    return seconds / M.SECONDS_PER_TICK
+end
+
+-- tickを秒に変換
+-- @param ticks tick数
+-- @return number 秒数
+function M.ticksToSeconds(ticks)
+    return ticks * M.SECONDS_PER_TICK
+end
+
+
 -- 季節の定義 (月)
 M.SEASONS = {
     SPRING = { start_month = 4, end_month = 6, name = "春" },
