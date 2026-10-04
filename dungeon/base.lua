@@ -1,4 +1,4 @@
--- dungeon/base.lua: ダンジョン探索の暫定実装、マップ生成、敵配置、戦闘遷移、描画を管理する責務。
+
 local battle = require("battle.battle")
 local status = require("battle.status")
 local enemies = require("data.enemy")
@@ -304,13 +304,18 @@ function M.keypressed(key)
     if key == "down" or key == "s" then moved = tryMove(player, 0, 1) end
     if key == "left" or key == "a" then moved = tryMove(player, -1, 0) end
     if key == "right" or key == "d" then moved = tryMove(player, 1, 0) end
-    if moved and not checkStairs() and not checkEncounter() then
+  
+    if moved then
+    state.advanceWorldTime(360)
+
+    if not checkStairs() and not checkEncounter() then
         for _, e in ipairs(dungeonEnemies) do
             if e.alive then updateEnemy(e) end
         end
         checkEncounter()
     end
 end
+
 
 local function drawTile(x, y, color)
     love.graphics.setColor(color)
