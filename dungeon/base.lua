@@ -1,4 +1,4 @@
--- dungeon/base.lua: ダンジョン探索の暫定実装、マップ生成、敵配置、戦闘遷移、描画を管理する責務。
+
 local battle = require("battle.battle")
 local status = require("battle.status")
 local enemies = require("data.enemy")
@@ -358,16 +358,6 @@ function M.returnToEntrance()
         player.x = entrancePosition.x
         player.y = entrancePosition.y
         status.clearStatusGauges(player.unit)
-    end
-    fieldUi.close()
-    mode = "dungeon"
-end
-
-M.aiTypes = aiTypes
-M.generateMap = generateMap
-
-return M
-clearStatusGauges(player.unit)
     end
     fieldUi.close()
     mode = "dungeon"
