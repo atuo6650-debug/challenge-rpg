@@ -315,13 +315,7 @@ function M.keypressed(key)
         checkEncounter()
     end
 end
- 
-        for _, e in ipairs(dungeonEnemies) do
-            if e.alive then updateEnemy(e) end
-        end
-        checkEncounter()
-    end
-end
+
 
 local function drawTile(x, y, color)
     love.graphics.setColor(color)
@@ -364,6 +358,16 @@ function M.returnToEntrance()
         player.x = entrancePosition.x
         player.y = entrancePosition.y
         status.clearStatusGauges(player.unit)
+    end
+    fieldUi.close()
+    mode = "dungeon"
+end
+
+M.aiTypes = aiTypes
+M.generateMap = generateMap
+
+return M
+clearStatusGauges(player.unit)
     end
     fieldUi.close()
     mode = "dungeon"
