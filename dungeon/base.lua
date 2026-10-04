@@ -304,7 +304,18 @@ function M.keypressed(key)
     if key == "down" or key == "s" then moved = tryMove(player, 0, 1) end
     if key == "left" or key == "a" then moved = tryMove(player, -1, 0) end
     if key == "right" or key == "d" then moved = tryMove(player, 1, 0) end
-    if moved and not checkStairs() and not checkEncounter() then
+  
+    if moved then
+    state.advanceWorldTime(360)
+
+    if not checkStairs() and not checkEncounter() then
+        for _, e in ipairs(dungeonEnemies) do
+            if e.alive then updateEnemy(e) end
+        end
+        checkEncounter()
+    end
+end
+ 
         for _, e in ipairs(dungeonEnemies) do
             if e.alive then updateEnemy(e) end
         end
