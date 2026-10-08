@@ -588,9 +588,7 @@ end
 
 -- 既存呼び出しとの互換用。
 -- 今後、外部からは updateTick() を使用する。
-function M.update(dt)
-    M.updateTick()
-end
+
 
 function drawGauge(x, y, v)
     love.graphics.rectangle("line", x, y, 100, 8)
