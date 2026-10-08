@@ -277,12 +277,19 @@ function M.load()
     mode = "dungeon"
 end
 
+-- バトルを1共通tick進める
+local function updateBattleTick()
+    battle.updateTick()
+    state.advanceWorldTime(10)
+end
+
 function M.update(dt)
     if mode == "town" then return end
+
     if mode == "battle" then
-        battle.update(dt)
         return
     end
+
     checkEncounter()
 end
 
