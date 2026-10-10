@@ -11,9 +11,13 @@ M.SECONDS_PER_DAY = 86400
 
 
 -- 共通tick
--- 1 tick = 10秒
+-- 1 tick = 10秒（ゲーム内時間）
 -- 将来この値を変更することで、1 tick の長さを変更できる。
 M.SECONDS_PER_TICK = 10
+
+-- 戦闘中に共通tickを進める現実時間の間隔（秒）。
+-- 0.5秒ごとに1 tick進める。
+M.REAL_SECONDS_PER_TICK = 0.5
 
 -- 秒をtickに変換
 -- @param seconds 秒数
