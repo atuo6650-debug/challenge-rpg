@@ -5,6 +5,7 @@ local enemies = require("data.enemy")
 local fieldUi = require("ui.field_ui")
 local town = require("town.town")
 local state = require("core.state")
+local time = require("core.time")
 
 local M = {}
 
@@ -23,6 +24,12 @@ local currentDistrict = "grass"
 local entrancePosition = nil
 local stairsPosition = nil
 local currentFloor = 1
+
+-- 戦闘中の共通tick管理
+local tickAccumulator = 0
+local enemyMoveTickCount = 0
+local activeBattleEnemy = nil
+local pendingBattleEnemy = nil
 
 local aiTypes = {
     SEE_PLAYER = "see_player",
@@ -186,7 +193,14 @@ local function updateEnemy(actor)
 end
 
 local function startBattle(enemyActor)
+    if mode ~= "dungeon" or not enemyActor or not enemyActor.alive then
+        return
+    end
+
     mode = "battle"
+    activeBattleEnemy = enemyActor
+    tickAccumulator = 0
+
     battle.start(player.unit, enemyActor.unit, function(result)
         if result == "You Win" then
             enemyActor.alive = false
@@ -195,6 +209,9 @@ local function startBattle(enemyActor)
             town.returnToTown(currentDistrict, player.unit, "defeat")
             mode = "town"
         end
+
+        activeBattleEnemy = nil
+        tickAccumulator = 0
     end)
 end
 
@@ -246,9 +263,12 @@ local function checkStairs()
 end
 
 local function checkEncounter()
+    if mode ~= "dungeon" then return false end
+
     for _, e in ipairs(dungeonEnemies) do
         if e.alive and distance(player, e) <= encounterDistance then
-            startBattle(e)
+            -- 戦闘開始要求を保持し、更新ループで一度だけ開始する。
+            pendingBattleEnemy = e
             return true
         end
     end
@@ -258,6 +278,10 @@ end
 function M.load()
     math.randomseed(os.time())
     currentFloor = 1
+    tickAccumulator = 0
+    enemyMoveTickCount = 0
+    activeBattleEnemy = nil
+    pendingBattleEnemy = nil
     generateMap()
     local px, py = centerOf(rooms[1])
     entrancePosition = {x = px, y = py}
@@ -277,17 +301,44 @@ function M.load()
     mode = "dungeon"
 end
 
--- バトルを1共通tick進める
+-- 共通tickを1回進め、戦闘と世界時間を同期させる。
+-- 1 tick = time.SECONDS_PER_TICK 秒。世界時間はここで一度だけ加算する。
 local function updateBattleTick()
     battle.updateTick()
-    state.advanceWorldTime(10)
+    state.advanceWorldTime(time.ticksToSeconds(1))
+
+    -- 戦闘中もダンジョン内の敵シンボルは36共通tickごとに1歩進む。
+    enemyMoveTickCount = enemyMoveTickCount + 1
+    if enemyMoveTickCount >= 36 then
+        enemyMoveTickCount = enemyMoveTickCount - 36
+        for _, e in ipairs(dungeonEnemies) do
+            if e.alive and e ~= activeBattleEnemy then
+                updateEnemy(e)
+            end
+        end
+    end
 end
 
 function M.update(dt)
     if mode == "town" then return end
 
     if mode == "battle" then
+        -- フレームごとではなく、現実時間0.5秒ごとに共通tickを進める。
+        tickAccumulator = tickAccumulator + dt
+        while tickAccumulator >= time.REAL_SECONDS_PER_TICK and mode == "battle" do
+            tickAccumulator = tickAccumulator - time.REAL_SECONDS_PER_TICK
+            updateBattleTick()
+        end
         return
+    end
+
+    if pendingBattleEnemy then
+        local enemyActor = pendingBattleEnemy
+        pendingBattleEnemy = nil
+        if enemyActor.alive then
+            startBattle(enemyActor)
+            return
+        end
     end
 
     checkEncounter()
@@ -313,16 +364,16 @@ function M.keypressed(key)
     if key == "right" or key == "d" then moved = tryMove(player, 1, 0) end
   
     if moved then
-    state.advanceWorldTime(360)
+        state.advanceWorldTime(360)
 
-    if not checkStairs() and not checkEncounter() then
-        for _, e in ipairs(dungeonEnemies) do
-            if e.alive then updateEnemy(e) end
+        if not checkStairs() and not checkEncounter() then
+            for _, e in ipairs(dungeonEnemies) do
+                if e.alive then updateEnemy(e) end
+            end
+            checkEncounter()
         end
-        checkEncounter()
     end
 end
-
 
 local function drawTile(x, y, color)
     love.graphics.setColor(color)
