@@ -1,10 +1,10 @@
-
 -- field/world.lua
 -- ワールドマップの基本データ、座標、地形を管理する。
 
 local M = {}
 
 local terrainData = require("data.terrain")
+local dungeonData = require("data.dungeon")
 
 -- マップの大きさ
 M.TILE_SIZE = 18
@@ -80,6 +80,21 @@ function M.getBase(id)
     return nil
 end
 
+-- 指定座標が拠点か確認する
+function M.isBase(x, y)
+    if not M.inBounds(x, y) then
+        return false
+    end
+
+    for _, base in ipairs(M.bases) do
+        if base.x == x and base.y == y then
+            return true
+        end
+    end
+
+    return false
+end
+
 -- 指定座標が街道上にあるか確認する
 local function isRoad(x, y)
     for _, road in ipairs(M.roads) do
@@ -108,14 +123,65 @@ local function isRoad(x, y)
     return false
 end
 
+-- ラストダンジョンの配置範囲内か確認する
+function M.isFinalDungeon(x, y)
+    if not M.inBounds(x, y) then
+        return false
+    end
+
+    local placement = dungeonData.getPlacement("final")
+
+    if not placement or not placement.fixed then
+        return false
+    end
+
+    return x >= placement.x
+        and x < placement.x + placement.width
+        and y >= placement.y
+        and y < placement.y + placement.height
+end
+
+-- 地形を変更できない固定場所か確認する
+function M.isFixedLocation(x, y)
+    if not M.inBounds(x, y) then
+        return false
+    end
+
+    return isRoad(x, y)
+        or M.isBase(x, y)
+        or M.isFinalDungeon(x, y)
+end
+
+-- 固定場所の種類を取得する
+-- 戻り値: "final_dungeon" / "base" / "road" / nil
+function M.getFixedLocationType(x, y)
+    if not M.inBounds(x, y) then
+        return nil
+    end
+
+    if M.isFinalDungeon(x, y) then
+        return "final_dungeon"
+    end
+
+    if M.isBase(x, y) then
+        return "base"
+    end
+
+    if isRoad(x, y) then
+        return "road"
+    end
+
+    return nil
+end
+
 -- 座標に地形を設定する
 function M.setTerrain(x, y, terrainType)
     if not M.inBounds(x, y) then
         return false
     end
 
-    -- 街道の地形は固定する
-    if isRoad(x, y) then
+    -- 街道・拠点・ラストダンジョンは固定する
+    if M.isFixedLocation(x, y) then
         return false
     end
 
@@ -138,6 +204,11 @@ end
 -- 座標から地形の種類を取得する
 function M.getTerrainType(x, y)
     if not M.inBounds(x, y) then
+        return nil
+    end
+
+    -- ラストダンジョンは通常地形として扱わない
+    if M.isFinalDungeon(x, y) then
         return nil
     end
 
