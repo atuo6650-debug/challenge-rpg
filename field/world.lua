@@ -119,15 +119,15 @@ function M.setTerrain(x, y, terrainType)
         return false
     end
 
--- 街道は固定データから判定するため、ここでは設定できない
-if terrainType == terrainData.types.ROAD then
-    return false
-end
+    -- 街道は固定データから判定するため、ここでは設定できない
+    if terrainType == terrainData.types.ROAD then
+        return false
+    end
 
--- 存在する地形か確認する
-if not terrainData.get(terrainType) then
-    return false
-end
+    -- 存在する地形か確認する
+    if not terrainData.get(terrainType) then
+        return false
+    end
 
     M.terrainMap[y] = M.terrainMap[y] or {}
     M.terrainMap[y][x] = terrainType
