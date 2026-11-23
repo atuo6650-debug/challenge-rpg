@@ -141,14 +141,20 @@ function M.isFinalDungeon(x, y)
         and y < placement.y + placement.height
 end
 
--- 指定座標が中央の通行不能帯か確認する
-function M.isImpassable(x, y)
-    if not M.inBounds(x, y) then
+
+-- 隣接するタイル間の移動が中央の通行不能ラインを横切るか確認する
+-- 移動元・移動先の座標を指定する。
+function M.isBlockedMove(fromX, fromY, toX, toY)
+    if not M.inBounds(fromX, fromY)
+        or not M.inBounds(toX, toY) then
         return false
     end
 
-    -- 街道とラストダンジョンは通行可能
-    if isRoad(x, y) or M.isFinalDungeon(x, y) then
+    -- 隣接する上下左右への移動だけを判定する
+    local distance = math.abs(toX - fromX)
+        + math.abs(toY - fromY)
+
+    if distance ~= 1 then
         return false
     end
 
@@ -169,25 +175,37 @@ function M.isImpassable(x, y)
     local northRoadY = 8
     local southRoadY = 49
 
-    -- ラストダンジョンから北・南へ伸びる帯
-    local verticalBand =
-        x >= left and x <= right
-        and (
-            (y > northRoadY and y < top)
+    -- 北・南のライン
+    -- x方向に隣のタイルへ移動するとき、
+    -- 2列の境界を横切る移動を禁止する。
+    local verticalLine =
+        (
+            (fromX == left and toX == right)
             or
-            (y > bottom and y < southRoadY)
+            (fromX == right and toX == left)
+        )
+        and (
+            (fromY > northRoadY and fromY < top)
+            or
+            (fromY > bottom and fromY < southRoadY)
         )
 
-    -- ラストダンジョンから西・東へ伸びる帯
-    local horizontalBand =
-        y >= top and y <= bottom
-        and (
-            (x > westRoadX and x < left)
+    -- 西・東のライン
+    -- y方向に隣のタイルへ移動するとき、
+    -- 2行の境界を横切る移動を禁止する。
+    local horizontalLine =
+        (
+            (fromY == top and toY == bottom)
             or
-            (x > right and x < eastRoadX)
+            (fromY == bottom and toY == top)
+        )
+        and (
+            (fromX > westRoadX and fromX < left)
+            or
+            (fromX > right and fromX < eastRoadX)
         )
 
-    return verticalBand or horizontalBand
+    return verticalLine or horizontalLine
 end
 
 -- 地形を変更できない固定場所か確認する
