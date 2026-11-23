@@ -141,6 +141,73 @@ function M.isFinalDungeon(x, y)
         and y < placement.y + placement.height
 end
 
+
+-- 隣接するタイル間の移動が中央の通行不能ラインを横切るか確認する
+-- 移動元・移動先の座標を指定する。
+function M.isBlockedMove(fromX, fromY, toX, toY)
+    if not M.inBounds(fromX, fromY)
+        or not M.inBounds(toX, toY) then
+        return false
+    end
+
+    -- 隣接する上下左右への移動だけを判定する
+    local distance = math.abs(toX - fromX)
+        + math.abs(toY - fromY)
+
+    if distance ~= 1 then
+        return false
+    end
+
+    local placement = dungeonData.getPlacement("final")
+
+    if not placement or not placement.fixed then
+        return false
+    end
+
+    local left = placement.x
+    local right = placement.x + placement.width - 1
+    local top = placement.y
+    local bottom = placement.y + placement.height - 1
+
+    -- 外周街道の座標
+    local westRoadX = 8
+    local eastRoadX = 77
+    local northRoadY = 8
+    local southRoadY = 49
+
+    -- 北・南のライン
+    -- x方向に隣のタイルへ移動するとき、
+    -- 2列の境界を横切る移動を禁止する。
+    local verticalLine =
+        (
+            (fromX == left and toX == right)
+            or
+            (fromX == right and toX == left)
+        )
+        and (
+            (fromY > northRoadY and fromY < top)
+            or
+            (fromY > bottom and fromY < southRoadY)
+        )
+
+    -- 西・東のライン
+    -- y方向に隣のタイルへ移動するとき、
+    -- 2行の境界を横切る移動を禁止する。
+    local horizontalLine =
+        (
+            (fromY == top and toY == bottom)
+            or
+            (fromY == bottom and toY == top)
+        )
+        and (
+            (fromX > westRoadX and fromX < left)
+            or
+            (fromX > right and fromX < eastRoadX)
+        )
+
+    return verticalLine or horizontalLine
+end
+
 -- 地形を変更できない固定場所か確認する
 function M.isFixedLocation(x, y)
     if not M.inBounds(x, y) then
