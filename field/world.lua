@@ -141,6 +141,55 @@ function M.isFinalDungeon(x, y)
         and y < placement.y + placement.height
 end
 
+-- 指定座標が中央の通行不能帯か確認する
+function M.isImpassable(x, y)
+    if not M.inBounds(x, y) then
+        return false
+    end
+
+    -- 街道とラストダンジョンは通行可能
+    if isRoad(x, y) or M.isFinalDungeon(x, y) then
+        return false
+    end
+
+    local placement = dungeonData.getPlacement("final")
+
+    if not placement or not placement.fixed then
+        return false
+    end
+
+    local left = placement.x
+    local right = placement.x + placement.width - 1
+    local top = placement.y
+    local bottom = placement.y + placement.height - 1
+
+    -- 外周街道の座標
+    local westRoadX = 8
+    local eastRoadX = 77
+    local northRoadY = 8
+    local southRoadY = 49
+
+    -- ラストダンジョンから北・南へ伸びる帯
+    local verticalBand =
+        x >= left and x <= right
+        and (
+            (y > northRoadY and y < top)
+            or
+            (y > bottom and y < southRoadY)
+        )
+
+    -- ラストダンジョンから西・東へ伸びる帯
+    local horizontalBand =
+        y >= top and y <= bottom
+        and (
+            (x > westRoadX and x < left)
+            or
+            (x > right and x < eastRoadX)
+        )
+
+    return verticalBand or horizontalBand
+end
+
 -- 地形を変更できない固定場所か確認する
 function M.isFixedLocation(x, y)
     if not M.inBounds(x, y) then
