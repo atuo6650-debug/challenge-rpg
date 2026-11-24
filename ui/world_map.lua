@@ -217,3 +217,5 @@ function M.draw(originX, originY)
 
     love.graphics.setColor(1, 1, 1, 1)
 end
+
+return M
