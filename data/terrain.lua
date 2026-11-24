@@ -4,7 +4,7 @@
 
 local M = {}
 
--- 地形の定義
+-- 地形の種類
 M.types = {
     GRASSLAND = "grassland",
     FOREST = "forest",
@@ -16,22 +16,26 @@ M.types = {
 M.definitions = {
     grassland = {
         name = "草地",
-        moveSeconds = 1200
+        moveSeconds = 1200,
+        color = {0.45, 0.65, 0.30}
     },
 
     forest = {
         name = "森林",
-        moveSeconds = 1800
+        moveSeconds = 1800,
+        color = {0.15, 0.40, 0.20}
     },
 
     mountain = {
         name = "山地",
-        moveSeconds = 2400
+        moveSeconds = 2400,
+        color = {0.50, 0.48, 0.45}
     },
 
     road = {
         name = "街道",
-        moveSeconds = 600
+        moveSeconds = 600,
+        color = {0.75, 0.65, 0.40}
     }
 }
 
