@@ -10,14 +10,6 @@ local M = {}
 
 local TILE_SIZE = world.TILE_SIZE
 
--- 地形ごとの表示色
-local terrainColors = {
-    grassland = {0.45, 0.65, 0.30},
-    forest = {0.15, 0.40, 0.20},
-    mountain = {0.50, 0.48, 0.45},
-    road = {0.75, 0.65, 0.40}
-}
-
 -- 地形未設定時の仮表示色
 local unknownColor = {0.30, 0.35, 0.30}
 
@@ -46,7 +38,11 @@ local function drawTerrain(originX, originY)
             local color = unknownColor
 
             if terrainType then
-                color = terrainColors[terrainType] or unknownColor
+                local terrain = terrainData.get(terrainType)
+
+                if terrain and terrain.color then
+                    color = terrain.color
+                end
             end
 
             drawTile(x, y, color, originX, originY)
@@ -115,6 +111,46 @@ local function drawFinalDungeon(originX, originY)
     )
 end
 
+-- 通常ダンジョンの入口を描画する
+-- 配置データが追加されたら、その座標を読み取って表示する。
+local function drawNormalDungeons(originX, originY)
+    for id, placement in pairs(dungeonData.placements or {}) do
+        -- ラストダンジョンは別の関数で描画する。
+        if id ~= "final"
+            and type(placement) == "table"
+            and type(placement.x) == "number"
+            and type(placement.y) == "number" then
+
+            local width = placement.width or 1
+            local height = placement.height or 1
+
+            local x = originX + (placement.x - 1) * TILE_SIZE
+            local y = originY + (placement.y - 1) * TILE_SIZE
+
+            -- 通常ダンジョンの入口
+            love.graphics.setColor(0.95, 0.75, 0.20, 1)
+
+            love.graphics.rectangle(
+                "fill",
+                x + 3,
+                y + 3,
+                width * TILE_SIZE - 6,
+                height * TILE_SIZE - 6
+            )
+
+            love.graphics.setColor(1, 1, 1, 1)
+
+            love.graphics.rectangle(
+                "line",
+                x + 3,
+                y + 3,
+                width * TILE_SIZE - 6,
+                height * TILE_SIZE - 6
+            )
+        end
+    end
+end
+
 -- 十字型通行不能帯を描画する
 -- field/world.lua の isBlockedMove() と同じ境界座標を使用する。
 local function drawBlockedAreas(originX, originY)
@@ -176,9 +212,8 @@ function M.draw(originX, originY)
     drawTerrain(originX, originY)
     drawBases(originX, originY)
     drawFinalDungeon(originX, originY)
+    drawNormalDungeons(originX, originY)
     drawBlockedAreas(originX, originY)
 
     love.graphics.setColor(1, 1, 1, 1)
 end
-
-return M
