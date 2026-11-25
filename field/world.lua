@@ -5,6 +5,7 @@ local M = {}
 
 local terrainData = require("data.terrain")
 local dungeonData = require("data.dungeon")
+local fieldTerrain = require("field.terrain")
 
 -- マップの大きさ
 M.TILE_SIZE = 18
@@ -56,6 +57,23 @@ M.roads = {
 -- 地形の座標データ
 -- terrainMap[y][x] の形式で管理する。
 M.terrainMap = {}
+
+-- プレイヤーの移動テスト用の仮初期座標
+-- 拠点1の街道上から開始する。
+-- 正式な初期配置は別Issueで扱う。
+local playerPosition = {
+    x = 15,
+    y = 8
+}
+
+-- プレイヤーの現在座標を取得する
+-- 外部から直接座標を書き換えられないよう、コピーを返す。
+function M.getPlayerPosition()
+    return {
+        x = playerPosition.x,
+        y = playerPosition.y
+    }
+end
 
 -- 座標がマップ内にあるか確認する
 function M.inBounds(x, y)
@@ -313,6 +331,61 @@ function M.getMoveSeconds(x, y)
     end
 
     return terrainData.getMoveSeconds(terrainType)
+end
+
+-- プレイヤーを上下左右に1タイル移動させる。
+-- dx: 左 -1 / 右 1
+-- dy: 上 -1 / 下 1
+--
+-- 成功: true, 消費した秒数
+-- 失敗: false, 理由
+function M.movePlayer(dx, dy)
+    -- 上下左右の1タイル移動だけを許可する。
+    if (dx ~= -1 and dx ~= 0 and dx ~= 1)
+        or (dy ~= -1 and dy ~= 0 and dy ~= 1) then
+        return false, "invalid_direction"
+    end
+
+    if math.abs(dx) + math.abs(dy) ~= 1 then
+        return false, "invalid_direction"
+    end
+
+    local fromX = playerPosition.x
+    local fromY = playerPosition.y
+
+    local toX = fromX + dx
+    local toY = fromY + dy
+
+    -- マップ外への移動を禁止する。
+    if not M.inBounds(toX, toY) then
+        return false, "out_of_bounds"
+    end
+
+    -- 中央の通行不能ラインを横切る移動を禁止する。
+    if M.isBlockedMove(fromX, fromY, toX, toY) then
+        return false, "blocked"
+    end
+
+    -- 移動先の地形を確認する。
+    local terrainType = M.getTerrainType(toX, toY)
+
+    -- 未設定地形やラストダンジョンには移動できない。
+    if not terrainType then
+        return false, "unassigned_terrain"
+    end
+
+    -- 地形に応じて世界時間を進める。
+    local success, seconds = fieldTerrain.advanceTime(terrainType)
+
+    if not success then
+        return false, "invalid_terrain"
+    end
+
+    -- 時間進行が成功した場合だけ座標を更新する。
+    playerPosition.x = toX
+    playerPosition.y = toY
+
+    return true, seconds
 end
 
 return M
